@@ -6,9 +6,9 @@ const app = require('./app');
 const {url, port} = require('./config');
 
 // SWAGGER pour documentation de l'API
-const swaggerAutogen = require ('swagger-autogen');
-const outputFile = './swagger_output.json';
-swaggerAutogen(outputFile, ['./app.js']);
+// const swaggerAutogen = require ('swagger-autogen');
+// const outputFile = './swagger_output.json';
+// swaggerAutogen(outputFile, ['./app.js']);
 
 mongoose
     .connect(url + '/countries_api')

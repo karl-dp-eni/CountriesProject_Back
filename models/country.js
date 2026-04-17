@@ -10,6 +10,7 @@ const Country = mongoose.model('Country', {
             ref: 'City',
         },
     ],
+    europeanUnion: Boolean,
 });
 
 module.exports = Country;

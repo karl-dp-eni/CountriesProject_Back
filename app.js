@@ -16,33 +16,103 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc))
 
 // Mock
 async function dbReset() {
+    // Nettoyer les deux tables
+    await City.deleteMany();
+    await Country.deleteMany();
+
+    // Ajouter 3 pays
     const france = new Country({
         name: 'France',
         code: 'FR',
         uuid: crypto.randomUUID(),
+        europeanUnion: true,
     });
     await france.save();
+
+    const espagne = new Country({
+        name: 'Espagne',
+        code: 'ES',
+        uuid: crypto.randomUUID(),
+        europeanUnion: true,
+    });
+    await espagne.save();
+
+    const royaumeUni = new Country({
+        name: 'Royaume-Uni',
+        code: 'UK',
+        uuid: crypto.randomUUID(),
+        europeanUnion: false,
+    });
+    await royaumeUni.save();
 
     const rennes = new City({
         name: 'Rennes',
         uuid: crypto.randomUUID(),
+        country: france._id,
+        population: 200000,
     });
 
-    const nantes = new City({
-        name: 'Nantes',
+    const londres = new City({
+        name: 'Londres',
         uuid: crypto.randomUUID(),
-        sisterCity: rennes._id,
+        country: royaumeUni._id,
+        population: 9000000,
     });
 
-    rennes.sisterCity = nantes._id;
+    const barcelone = new City({
+        name: 'Barcelone',
+        uuid: crypto.randomUUID(),
+        country: espagne._id,
+        population: 12000000,
+    });
 
-    rennes.save();
-    nantes.save();
+    const paris = new City({
+        name: 'Paris',
+        uuid: crypto.randomUUID(),
+        country: france._id,
+        population: 11000000,
+    });
 
-    france.cities.push(nantes);
-    france.cities.push(rennes);
+    await rennes.save();
+    await londres.save();
+    await barcelone.save();
+    await paris.save();
 
-    france.save();
+    await City.aggregate([
+        {
+            $lookup: { // sert à faire la jointure
+                from: 'countries',
+                localField: 'country',
+                foreignField: '_id',
+                as: 'country'
+            },
+        },
+        {$unwind: '$country'}, // transforme la jointure en objet exploitable
+        {$match: {'country.europeanUnion': true}},
+        {
+            $project: {
+                _id: 0,
+                country: '$country.name',
+                name: 1,
+            },
+        },
+        {
+            $sort: {
+                population: -1 // Trier par population DESC
+            }
+        }
+    ]).then((cities) => {
+        console.log('Villes en union européenne :', cities);
+    });
+
+    await City.aggregate([
+        { $group: { _id: '$country', population: { $sum: '$population' } } },
+        { $lookup: { from: 'countries', localField: '_id', foreignField: '_id', as: 'country' } },
+        { $unwind: '$country' },
+        { $project: { _id: 0, country: '$country.name', population: 1 } },
+    ]).then((cities) => {
+        console.log('Population par pays', cities);
+    });
 }
 
 dbReset();
@@ -87,7 +157,7 @@ app.post('/countries',
 
 // Afficher un pays en détail
 app.get('/countries/:code', async (req, res) => {
-    await Country.findOne({ code: req.params.code }).then((country) => {
+    await Country.findOne({code: req.params.code}).then((country) => {
         res.status(200).json(country);
     });
 });
@@ -97,8 +167,8 @@ app.put('/countries/updateByCode/:code', async (req, res) => {
     console.log('body', req.body);
 
     await Country.findOneAndUpdate(
-        { code: req.params.code },
-        { name: req.params.name },
+        {code: req.params.code},
+        {name: req.params.name},
     ).then((country) => res.status(200).json(country));
 });
 
@@ -107,31 +177,26 @@ app.put('/countries/updateById/:uuid', async (req, res) => {
     console.log('body', req.body);
 
     await Country.findOneAndUpdate(
-        { uuid: req.params.uuid },
-        { name: req.params.name },
-        { new: true },
+        {uuid: req.params.uuid},
+        {name: req.params.name},
+        {new: true},
     ).then((country) => res.status(200).json(country));
 });
 
 // CRUD - DELETE pays
 app.delete('/countries/:code', async (req, res) => {
     await Country.findOneAndDelete(
-        { code: req.params.code },
+        {code: req.params.code},
     ).then((response) => {
         res.status(200).json(response);
     });
 });
 
-// Erreur si page non existante
-app.use((req, res) => {
-    res.status(404).send("Page non trouvée");
-})
-
 // ---------- VILLES ------------//
 
 app.get('/cities', (req, res) => {
+    console.log('test')
     City.find()
-        .populate('sisterCity')
         .then((cities) => {
             console.log('cities', cities);
 
@@ -175,6 +240,11 @@ app.post('/cities/update', async (req, res) => {
     );
     res.redirect('/cities');
 });
+
+// Erreur si page non existante
+app.use((req, res) => {
+    res.status(404).send("Page non trouvée");
+})
 
 // EXPORT
 module.exports = app;
