@@ -125,8 +125,8 @@ async function dbReset() {
 const users = [
     {
         id: 1,
-        username: 'admin',
-        password: 'admin',
+        username: "admin",
+        password: "admin",
     },
 ];
 
@@ -154,7 +154,7 @@ app.post('/auth',
     });
 
 function extractToken(headerValue) {
-    if (typeof headerValue !== string) {
+    if (typeof headerValue !== "string") {
         return false;
     }
     const matches = headerValue.match(/(bearer)\s+(\S+)/i);
@@ -185,7 +185,7 @@ app.get('/countries', async (req, res) => {
 });
 
 // CRUD - CREATE nouveau Pays
-app.post('/countries',
+app.post('/countries', checkTokenMiddleware,
     body('name')
         .isLength({min: 3})
         .withMessage('Le Pays doit avoir au moins 3 caractères'),
