@@ -14,6 +14,10 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerDoc = require('./swagger_output.json');
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc))
 
+// Auth - JWT
+const jwt = require('jsonwebtoken');
+const { SECRET } = require('./env.js');
+
 // Mock
 async function dbReset() {
     // Nettoyer les deux tables
@@ -115,7 +119,16 @@ async function dbReset() {
     });
 }
 
-dbReset();
+// dbReset();
+
+// Utilisateur
+const users = [
+    {
+        id: 1,
+        username: 'admin',
+        password: 'admin',
+    },
+];
 
 // Middleware
 app.use((req, res, next) => {
@@ -123,10 +136,51 @@ app.use((req, res, next) => {
     next();
 });
 
+// Route post pour gérer la connexion utilisateur
+app.post('/auth',
+    async (req, res, next) => {
+    const user = users.find((u) => u.username === req.body.username && u.password === req.body.password);
+        if (!user) {
+            return res.status(400).json({ message: 'Mauvais utilisateur' });
+        }
+        // Sinon l'utilisateur a été trouvé, donc on construit le token
+        const token = jwt.sign({
+            id: user.id,
+            username: user.username,
+        }, SECRET,
+            { expiresIn: '3 hours' }
+        );
+        return res.json({ access_token: token });
+    });
+
+function extractToken(headerValue) {
+    if (typeof headerValue !== string) {
+        return false;
+    }
+    const matches = headerValue.match(/(bearer)\s+(\S+)/i);
+    return matches && matches[2]; // on verifie qu'il y a un bearer token et on prend la valeur du token
+}
+
+function checkTokenMiddleware(req, res, next) {
+    const token = req.header.authorization && extractToken(req.header.authorization)
+
+    if (!token) {
+        return res.status(401).json({ message: "Erreur: besoin d'un token" })
+    }
+
+    jwt.verify(token, SECRET, (err, decodedToken) => {
+        if (err) {
+            return res.status(401).json({ message: "Erreur: mauvais token" });
+        } else {
+            return next();
+        }
+    });
+}
+
 // ------------ PAYS --------------//
 // Route principale qui permet d'afficher les pays
 app.get('/countries', async (req, res) => {
-    const countries = await Country.find().populate('cities');
+    const countries = await Country.find();
     res.json(countries);
 });
 
